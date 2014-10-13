@@ -1,0 +1,276 @@
+local pasteCode = "ZT1euz3x"
+
+--if vfs then os.unloadAPI('vfs') end
+if (not vfs) and (os.loadAPI("/Crow/APIs/vfs") == false) then
+	if http then
+		get = http.get("http://pastebin.com/raw.php?i=" .. pasteCode)
+		if get then
+			text = get.readAll()
+			f = fs.open("vfs", "w")
+			f.write(text)
+			f.close()
+			get.close()
+			if os.loadAPI("vfs") == false then
+				printError( "RAMDisk could not load VFS API" )
+				return
+			end
+		else
+			printError( "RAMDisk could not load VFS API" )
+			return
+		end
+	else
+		printError( "RAMDisk could not load VFS API" )
+		return
+	end
+end
+
+local function printUsage()
+	if term.isColour() then
+		term.setTextColor( colors.yellow )
+		
+		print( "Loaded Images:" )
+		tList1 = vfs.listMountedImages()
+		--print(textutils.serialize(tList1))
+		tList2 = {}
+		for i = 1, #tList1 do
+			table.insert(tList2, "//" .. tList1[i])
+		end
+		textutils.pagedTabulate( colors.green, tList2 , colors.yellow )
+		
+		print( "Usages:" )
+		
+		term.setTextColor( colors.white )
+		write( "ramdisk" )
+		term.setTextColor( colors.blue )
+		write( " create " )
+		term.setTextColor( colors.red )
+		print( "<drive name>")
+		
+		term.setTextColor( colors.white )
+		write( "ramdisk" )
+		term.setTextColor( colors.blue )
+		write( " save " )
+		term.setTextColor( colors.red )
+		print( "<drive name> <filename>")
+		
+		term.setTextColor( colors.white )
+		write( "ramdisk" )
+		term.setTextColor( colors.blue )
+		write( " load " )
+		term.setTextColor( colors.red )
+		print( "<filename>")
+		
+		term.setTextColor( colors.white )
+		write( "ramdisk" )
+		term.setTextColor( colors.blue )
+		write( " unload " )
+		term.setTextColor( colors.red )
+		print( "<drive name>" )
+		
+		term.setTextColor( colors.white )
+	else
+		
+		print( "Loaded Images:" )
+		tList1 = vfs.listMountedImages()
+		tList2 = {}
+		for i = 1, #tList1 do
+			table.insert(tList2, "//" .. tList1[i])
+		end
+		textutils.pagedTabulate( tList2 )
+		
+		print( "Usages:" )
+		print( "ramdisk create <drive name>" )
+		print( "ramdisk save <drive name> <filename>" )
+		print( "ramdisk load <filename>" )
+		print( "ramdisk unload <drive name>" )
+	end
+end
+ 
+local tArgs = { ... }
+if #tArgs < 2 then
+    printUsage()
+    return
+end
+
+local count = 0
+local function serializeImpl( t, tTracking, sIndent )
+	count = count + 1
+	if count % 499 == 0 then sleep(0) end
+    local sType = type(t)
+    if sType == "table" then
+        if tTracking[t] ~= nil then
+            error( "Cannot serialize table with recursive entries", 0 )
+        end
+        tTracking[t] = true
+
+        if next(t) == nil then
+            -- Empty tables are simple
+            return "{}"
+        else
+            -- Other tables take more work
+            local sResult = "{"--\n"
+            local sSubIndent = "" -- sIndent .. "  "
+            local tSeen = {}
+            for k,v in ipairs(t) do
+				print('k: ' .. k .. ';v: ' .. v)
+                tSeen[k] = true
+                sResult = sResult .. sSubIndent .. serializeImpl( v, tTracking, sSubIndent ) .. ";" --\n"
+            end
+            for k,v in pairs(t) do
+                if not tSeen[k] then
+                    local sEntry
+                    if type(k) == "string" and string.match( k, "^[%a_][%a%d_]*$" ) then
+                        sEntry = k .. "=" .. serializeImpl( v, tTracking, sSubIndent ) .. ";" --\n"
+                    else
+                        sEntry = "[" .. serializeImpl( k, tTracking, sSubIndent ) .. "]=" .. serializeImpl( v, tTracking, sSubIndent ) .. ";" --\n"
+                    end
+                    sResult = sResult .. sSubIndent .. sEntry
+                end
+            end
+            sResult = sResult .. sIndent .. "}"
+            return sResult
+        end
+        
+    elseif sType == "string" then
+        return string.format( "%q", t )
+    
+    --[[elseif sType == "number" or sType == "boolean" or sType == "nil" then
+        return tostring(t)]]
+		
+	elseif sType == "boolean" or sType == "nil" then
+        return tostring(t)
+        
+	elseif sType == "number" then
+		return string.format('%02x', t)
+		
+    else
+        error( "Cannot serialize type "..sType, 0 )
+        
+    end
+end
+
+function bigSerialize( t ) --patched so it doesn't hang when encoding big tables, and in this case, drives
+    local tTracking = {}
+    return serializeImpl( t, tTracking, "" )
+end
+
+function getSize(path)
+	if fs.isDir(path) then
+		list = fs.list(path)
+		size = 0
+		for i = 1, #list do
+			size = size + getSize(fs.combine(path, list[i]))
+		end
+		return size
+	else
+		return fs.getSize(path)
+	end
+end
+
+function ssize(bytes)
+	if bytes > (2 ^ 10) - 1 then
+		if bytes > (2 ^ 20) - 1 then
+			return math.floor(bytes / (2 ^ 20)) .. '.' .. string.sub(bytes % (2 ^ 20), 1, 2) .. 'MB'
+		else
+			return math.floor(bytes / (2 ^ 10)) .. '.' .. string.sub(bytes % (2 ^ 10), 1, 2) .. 'KB'
+		end
+	else
+		return bytes .. 'B'
+	end
+end
+
+local func = tArgs[1]
+if func == "create" then
+	vfs.mount(vfs.createImage(tArgs[2]))
+elseif func == "save" then
+	if #tArgs < 3 then
+		printUsage()
+		return
+	end
+	if vfs.getMountedImage(tArgs[2]) == nil then
+		error(tArgs[2] .. " is not a mounted image")
+	end
+	
+	path = shell.resolve(tArgs[3])
+	f = fs.open(path, "w")
+	f.write('return ' .. bigSerialize(vfs.getMountedImage(tArgs[2])))
+	f.close()
+elseif func == "load" then
+	local path = shell.resolve(tArgs[2])
+	local func
+	if fs.exists(path) == false then
+		error(path .. " does not exist")
+	elseif fs.isDir(path) == true then
+		local currentSize = 0
+		local totalSize = getSize(path)
+		local x, y = term.getCursorPos()
+		local w, h = term.getSize()
+		local seconds = 0
+		func = function()
+			local function copyProgress(fromPath, toPath)
+				if fs.isDir(fromPath) then
+					if fs.exists(toPath) == false then fs.createDir(toPath) end
+					local tList = fs.list(fromPath)
+					for i = 1, #tList do
+						copyProgress(fromPath .. '/' .. fs.getName(tList[i]), toPath .. '/' .. fs.getName(tList[i]))
+					end
+					return
+				end
+				local f = fs.open(fromPath, "rb")				
+				local wr = fs.open(toPath, "wb")
+				local concat = ''
+				for b in f.read do
+					currentSize = currentSize + 1
+					term.setCursorPos(x, y)
+					local str = math.floor(100 * currentSize / totalSize) .. '% (' .. fromPath .. ' > ' .. toPath .. ') ' .. ssize(currentSize) .. '/' .. ssize(totalSize) .. ' ' .. seconds .. 's'
+					
+					write(str .. string.rep(' ', w - #str))
+					--wr.write(b)
+					concat = concat .. string.format('%02x', b)
+					if currentSize % 2111 == 0 then
+						sleep(0)
+					end
+				end
+				wr.writeRaw(concat)
+				wr.close()
+				f.close()
+			end
+			
+			local function t()
+				while true do
+					sleep(1)
+					seconds = seconds + 1
+				end
+			end
+				
+			vfs.mount(vfs.createImage(fs.getName(path)))
+			
+			parallel.waitForAny(function() copyProgress(path, "//" .. fs.getName(path)) end, t)
+		end
+	else
+		func = function()
+			local f = fs.open(path, "r")
+			--vfs.mount(textutils.unserialize(f.readAll()))
+			local x = loadfile(path)
+			vfs.mount(x())
+			f.close()
+		end
+	end
+	
+	--[[local function wait()
+		while true do
+			sleep(999999)
+		end
+	end
+	
+	parallel.waitForAny(func, wait)]]
+	func()
+elseif func == "unload" then
+	if vfs.getMountedImage(tArgs[2]) == nil then
+		error(tArgs[2] .. " is not a mounted image")
+	end
+	vfs.unmount(tArgs[2])
+else
+	printUsage()
+    return
+end

@@ -1,0 +1,30 @@
+barTextColor = colors.lightGray
+barBGColor = colors.gray
+BGColor = colors.lightGray
+TextColor = colors.gray
+local t = term
+local term = t
+t.setBackgroundColor(BGColor)
+t.clear()
+term.setCursorPos(1,1)
+term.setBackgroundColor(barBGColor)
+term.setTextColor(barTextColor)
+print("Crow : Programs")
+term.setBackgroundColor(BGColor)
+term.setTextColor(TextColor)
+term.setCursorPos(1,5)
+print("I suppose you are looking for Games.    ")
+print("At the moment the gaames we have been testing ")
+print("have not been working lately....")
+print("So there will be a fix not long after this comes out ")
+print("so yeah...")
+print(" ")
+print("          ")
+print("Back      ")
+print(" ")
+while true do
+  local event, button, xPos, yPos = os.pullEvent("mouse_click")
+  if event == "mouse_click" and button == 1 and xPos >0 and xPos <11 and yPos == 13 then
+  shell.run("/Crow/System/.desktop")
+  end
+end

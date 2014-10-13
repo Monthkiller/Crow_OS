@@ -1,0 +1,34 @@
+barTextColor = colors.lightGray
+barBGColor = colors.gray
+BGColor = colors.lightGray
+TextColor = colors.gray
+local t = term
+local term = t
+t.setBackgroundColor(BGColor)
+t.clear()
+term.setCursorPos(1,1)
+term.setBackgroundColor(barBGColor)
+term.setTextColor(barTextColor)
+print("Crow : Desktop")
+term.setBackgroundColor(BGColor)
+term.setTextColor(TextColor)
+term.setCursorPos(1,5)
+print("Programs   ")
+print(" ")
+print("Games      ")
+print(" ")
+print("Settings   ")
+print(" ")
+print("Shutdown   ")
+while true do
+  local event, button, xPos, yPos = os.pullEvent("mouse_click")
+  if event == "mouse_click" and button == 1 and xPos >0 and xPos <11 and yPos == 5 then
+  shell.run("/Crow/System/.programs")
+  elseif event == "mouse_click" and button == 1 and xPos >0 and xPos <11 and yPos == 7 then
+  shell.run("/Crow/System/.games")
+  elseif event == "mouse_click" and button == 1 and xPos >0 and xPos <11 and yPos == 9 then
+  shell.run("/Crow/System/.settings")
+  elseif event == "mouse_click" and button == 1 and xPos >0 and xPos <11 and yPos == 11 then
+  shell.run("/Crow/System/.shutdown")
+  end
+end
